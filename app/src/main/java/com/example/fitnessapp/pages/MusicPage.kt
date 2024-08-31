@@ -3,33 +3,24 @@ package com.example.fitnessapp.pages
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.fitnessapp.API.Data
 import com.example.fitnessapp.API.NetworkResponse
 import com.example.fitnessapp.API.MyData
 import com.example.fitnessapp.AuthState
@@ -37,28 +28,30 @@ import com.example.fitnessapp.MusicViewModel
 import com.example.fitnessapp.R
 
 @Composable
-fun MusicPage(modifier: Modifier = Modifier,
-             navController: NavController,
-             authViewModel: MusicViewModel,
+fun MusicPage(
+    modifier: Modifier = Modifier,
+    navController: NavController,
+    authViewModel: MusicViewModel,
+) {
+    val authen by authViewModel.authState.observeAsState()
 
-             ) {
-    val authen = authViewModel.authState.observeAsState()
-
-    LaunchedEffect(authen.value) {
-        when (authen.value) {
-            is AuthState.Unauthenticated -> navController.navigate("LoginPage")
-            else -> Unit
+    LaunchedEffect(authen) {
+        if (authen is AuthState.Unauthenticated) {
+            navController.navigate("LoginPage")
         }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Color(0xFF1976D2)) // Ensure consistency with color
+    ) {
         Row(
             modifier = modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 0.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -68,16 +61,12 @@ fun MusicPage(modifier: Modifier = Modifier,
                 Text(
                     text = "Music",
                     fontSize = 35.sp,
-                    color = Color(0xFF43D849)
+                    color = Color.White
                 )
             }
-
-
-
         }
 
-
-        val musicResult = authViewModel.musicResult.observeAsState()
+        val musicResult by authViewModel.musicResult.observeAsState()
         val keyboardController = LocalSoftwareKeyboardController.current
 
         Column(
@@ -90,7 +79,7 @@ fun MusicPage(modifier: Modifier = Modifier,
                 authViewModel.getMusic()
             }
 
-            when (val result = musicResult.value) {
+            when (val result = musicResult) {
                 is NetworkResponse.Error -> {
                     Spacer(modifier = Modifier.size(200.dp))
                     Text(text = result.message, fontSize = 40.sp)
@@ -103,7 +92,7 @@ fun MusicPage(modifier: Modifier = Modifier,
 
                 is NetworkResponse.Success -> {
                     keyboardController?.hide()
-                    MusicDetails(data = result.data, modifier,navController)
+                    MusicDetails(data = result.data, modifier, navController)
                 }
 
                 null -> {}
@@ -113,61 +102,84 @@ fun MusicPage(modifier: Modifier = Modifier,
 }
 
 @Composable
-fun MusicDetails(data: MyData, modifier: Modifier = Modifier,navController: NavController) {
-    LazyColumn {
+fun MusicDetails(
+    data: MyData,
+    modifier: Modifier = Modifier,
+    navController: NavController
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp) // Consistent padding with HomePage
+    ) {
         items(data.data) { item ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp, horizontal = 8.dp)
-                    .height(120.dp)
-                    .clickable {
-                        //navController.navigate("PlayerPage" + item.album.cover + "," + item.title + "," + item.artist.link)
-                        navController.navigate("PlayerPage/${Uri.encode(item.album.cover)}/${Uri.encode(item.title)}/${Uri.encode(item.preview)}")
-
-                        //PlayerPage(name = item.title, cover = item.album.cover, link = item.link)
-
-
-                    },
-                elevation = CardDefaults.cardElevation(8.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = modifier
-                        .fillMaxWidth()
-                        .padding(6.dp)
-                ) {
-                    AsyncImage(
-                        model = item.album.cover,
-                        placeholder = painterResource(id = R.drawable.sudoimage),
-                        error = painterResource(id = R.drawable.sudoimage),
-                        contentDescription = "Album cover",
-                        modifier = Modifier
-                            .size(100.dp)
-                            .padding(end = 2.dp)
+            MusicItem(
+                data = item,
+                modifier = modifier,
+                onClick = {
+                    navController.navigate(
+                        "PlayerPage/${Uri.encode(item.album.cover)}/${Uri.encode(item.title)}/${Uri.encode(item.preview)}"
                     )
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.CenterVertically)
-                    ) {
-                        Text(
-                            text = item.title,
-                            fontSize = 18.sp
-                        )
-                        Text(
-                            text = item.artist.name,
-                            fontSize = 14.sp
-                        )
-                    }
                 }
+            )
+        }
+    }
+}
+
+@Composable
+fun MusicItem(
+    data: Data,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp, horizontal = 8.dp) // Reduced padding
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(8.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(8.dp) // Padding inside the card
+        ) {
+            AsyncImage(
+                model = data.album.cover_medium,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(60.dp)
+                    .background(Color.Gray, RoundedCornerShape(8.dp))
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = data.title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = data.artist.name,
+                    fontSize = 14.sp,
+                    color = Color.Gray
+                )
+                Text(
+                    text = formatDuration(data.duration),
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
             }
         }
     }
 }
 
-
-
-
-
+fun formatDuration(durationInSeconds: Int): String {
+    val minutes = durationInSeconds / 60
+    val seconds = durationInSeconds % 60
+    return String.format("%02d:%02d", minutes, seconds)
+}

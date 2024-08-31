@@ -1,5 +1,6 @@
 package com.example.fitnessapp
 
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -16,6 +17,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 class MusicViewModel:ViewModel()
 {
@@ -90,6 +92,44 @@ class MusicViewModel:ViewModel()
 
     }
 
+    fun signupbro(email: String, password: String, username: String, height: Float, weight: Float) {
+        if (email.isEmpty() || password.isEmpty() || username.isEmpty()) {
+            _authState.value = AuthState.Error("Empty Fields")
+            return
+        }
+        _authState.value = AuthState.Loading
+        auth.createUserWithEmailAndPassword(email, password)
+            .addOnCompleteListener {
+                if (it.isSuccessful) {
+                    val userId = auth.currentUser?.uid ?: ""
+                    // Store username, height, and weight in Firebase Realtime Database
+                    database.child("users").child(userId).setValue(mapOf(
+                        "username" to username,
+                        "height" to height.toString(),
+                        "weight" to weight.toString()
+                    ))
+                        .addOnSuccessListener {
+                            _authState.value = AuthState.Authenticated
+                        }
+                        .addOnFailureListener { exception ->
+                            _authState.value = AuthState.Error(exception.message ?: "Error saving user data")
+                        }
+                } else {
+                    _authState.value = AuthState.Error(it.exception?.message ?: "Signup failed")
+                }
+            }
+    }
+
+    fun updateUserProfile(username: String, height: Float, weight: Float) {
+        val userId = auth.currentUser?.uid ?: return
+        val updates = mapOf(
+            "username" to username,
+            "height" to height.toString(),
+            "weight" to weight.toString()
+        )
+        database.child("users").child(userId).updateChildren(updates)
+    }
+
     fun signupbro(email: String, password: String, username: String) {
         if (email.isEmpty() || password.isEmpty() || username.isEmpty()) {
             _authState.value = AuthState.Error("Empty Fields")
@@ -100,7 +140,7 @@ class MusicViewModel:ViewModel()
             .addOnCompleteListener {
                 if (it.isSuccessful) {
                     val userId = auth.currentUser?.uid ?: ""
-                    // Store username in Firebase Realtime Database or Firestore
+
                     database.child("users").child(userId).setValue(mapOf("username" to username))
                         .addOnSuccessListener {
                             _authState.value = AuthState.Authenticated
@@ -124,7 +164,7 @@ class MusicViewModel:ViewModel()
             }
 
             override fun onCancelled(error: DatabaseError) {
-                // Handle possible errors
+
             }
         })
     }
@@ -134,7 +174,7 @@ class MusicViewModel:ViewModel()
     fun logout(){
         auth.signOut()
         _authState.value=AuthState.Unauthenticated
-        _userData.value = emptyMap() // Clear user data on logout
+        _userData.value = emptyMap()
         _userEmail.value = null
     }
 
@@ -143,17 +183,6 @@ class MusicViewModel:ViewModel()
         return FirebaseAuth.getInstance().currentUser != null
     }
 
-    //fun fetchTasks() {
-    // val userId = auth.currentUser?.uid ?: return
-    //firestore.collection("tasks")
-    // .whereEqualTo("userId", userId)
-    // .addSnapshotListener { snapshot, e ->
-    //   if (e != null || snapshot == null) return@addSnapshotListener
-    // val taskList = snapshot.documents.mapNotNull { doc ->
-    //   doc.toObject(Task::class.java)
-    //}
-    //_tasks.postValue(taskList)
-    //}}
     fun fetchTasks() {
         val userId = auth.currentUser?.uid ?: return
         firestore.collection("tasks")
@@ -162,7 +191,7 @@ class MusicViewModel:ViewModel()
                 if (e != null || snapshot == null) return@addSnapshotListener
                 val taskList = snapshot.documents.mapNotNull { doc ->
                     val task = doc.toObject(Task::class.java)
-                    task?.let { it.copy(id = doc.id) } // Add the document ID to the task
+                    task?.let { it.copy(id = doc.id) }
                 }
                 _tasks.postValue(taskList)
             }
@@ -175,12 +204,19 @@ class MusicViewModel:ViewModel()
         firestore.collection("tasks").add(task)
     }
 
+    //nakli ka s dala hai
+    fun addTasks(name: String, goalDuration: String) {
+        val userId = auth.currentUser?.uid ?: return
+        val task = Task(name, goalDuration, "", userId) // Using an empty string for actualDuration
+        firestore.collection("tasks").add(task)
+    }
 
     fun addTask(name: String, goalDuration: String) {
         val userId = auth.currentUser?.uid ?: return
-        val task = Task(name, goalDuration, "", userId) // Using an empty string for `actualDuration`
+        val task = Task(name, goalDuration, "", userId) // Using an empty string for actualDuration
         firestore.collection("tasks").add(task)
     }
+
 
     private val MusicApi = RetrofitInstance.MusicAPI
     private val _musicResult =MutableLiveData<NetworkResponse<MyData>>()
@@ -208,9 +244,41 @@ class MusicViewModel:ViewModel()
         }
     }
 
+
     fun updateTask(taskId: String, actualDuration: String) {
-        firestore.collection("tasks").document(taskId).update("actualDuration", actualDuration)
+        val currentDate = Calendar.getInstance()
+        val day = currentDate.get(Calendar.DAY_OF_MONTH)
+        val month = currentDate.get(Calendar.MONTH) + 1 // Calendar.MONTH is 0-based, so add 1
+        val year = currentDate.get(Calendar.YEAR)
+
+        firestore.collection("tasks").document(taskId).update(
+            mapOf(
+                "actualDuration" to actualDuration,
+                "day" to day,
+                "month" to month,
+                "year" to year
+            )
+        )
     }
+
+   //yewala
+    fun fetchTasksForDate(day: Int, month: Int, year: Int) {
+        val userId = auth.currentUser?.uid ?: return
+        firestore.collection("tasks")
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("day", day)
+            .whereEqualTo("month", month)
+            .whereEqualTo("year", year)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null || snapshot == null) return@addSnapshotListener
+                val taskList = snapshot.documents.mapNotNull { doc ->
+                    val task = doc.toObject(Task::class.java)
+                    task?.let { it.copy(id = doc.id) }
+                }
+                _tasks.postValue(taskList)
+            }
+    }
+
 
 
 

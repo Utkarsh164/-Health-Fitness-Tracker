@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import com.example.fitnessapp.pages.HomePage
 import com.example.fitnessapp.pages.MusicPage
-import com.example.fitnessapp.pages.NotificationPage
 import com.example.fitnessapp.pages.ProfilePage
 
 @Composable

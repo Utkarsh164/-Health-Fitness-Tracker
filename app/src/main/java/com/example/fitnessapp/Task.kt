@@ -5,5 +5,10 @@ data class Task(
     val goalDuration: String = "",
     val actualDuration: String = "",
     val userId: String = "",
-    val id: String? = null // Optional, used for identifying tasks
+    val day: Int = 0,   // Add day field
+    val month: Int = 0, // Add month field
+    val year: Int = 0,  // Add year field
+    val id: String? = null
 )
+
+

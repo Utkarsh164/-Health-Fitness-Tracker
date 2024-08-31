@@ -20,12 +20,14 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.fitnessapp.AuthState
 import com.example.fitnessapp.MusicViewModel
+import com.example.fitnessapp.R
 import com.example.fitnessapp.Task
 import kotlinx.coroutines.launch
 
@@ -35,16 +37,24 @@ fun HomePage(
     navController: NavController,
     authViewModel: MusicViewModel,
 ) {
-    val authState = authViewModel.authState.observeAsState()
-    val tasks = authViewModel.tasks.observeAsState(listOf())
+    val authState by authViewModel.authState.observeAsState()
+    val tasks by authViewModel.tasks.observeAsState(listOf())
     var showAddDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf<Pair<String, Task>?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(authState.value) {
-        when (authState.value) {
-            is AuthState.Unauthenticated -> navController.navigate("LoginPage")
-            else -> Unit
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Unauthenticated) {
+            navController.navigate("LoginPage")
         }
+    }
+
+    LaunchedEffect(Unit) {
+        // Initial data fetch
+        isLoading = true
+        authViewModel.fetchTasks()
+        isLoading = false
     }
 
     Column(
@@ -62,6 +72,8 @@ fun HomePage(
             color = Color.White,
             modifier = Modifier.padding(bottom = 24.dp)
         )
+
+        // Buttons for adding new activity and viewing progress
         Row(
             modifier = Modifier
                 .padding(bottom = 16.dp)
@@ -76,8 +88,10 @@ fun HomePage(
                 Text(text = "Add New Activity")
             }
 
+            Spacer(modifier = Modifier.width(16.dp)) // Add space between buttons
+
             Button(
-                onClick = { navController.navigate("ProgressPage")},
+                onClick = { navController.navigate("ProgressPage") },
                 modifier = Modifier.width(200.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF43D849))
             ) {
@@ -85,28 +99,59 @@ fun HomePage(
             }
         }
 
-        LazyColumn(
-            contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(tasks.value) { task ->
-                FitnessActivityCard(
-                    activityName = task.name,
-                    goalDuration = task.goalDuration,
-                    actualDuration = task.actualDuration,
-                    onUpdateClick = {
-                        showUpdateDialog = task.id?.let { id -> id to task }
+        // Display a reload icon if list is empty
+        if (tasks.isEmpty() && !isLoading) {
+            IconButton(
+                onClick = {
+                    isLoading = true
+                    coroutineScope.launch {
+                        authViewModel.fetchTasks()
+                        isLoading = false
                     }
+                },
+                modifier = Modifier
+                    .size(78.dp) // Increase icon size
+                    .padding(bottom = 16.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.baseline_replay_circle_filled_24), // Replace with your reload icon resource
+                    contentDescription = "Reload Data",
+                    tint = Color.White
                 )
             }
         }
 
+        // Display a loading indicator if data is loading
+        if (isLoading) {
+            CircularProgressIndicator()
+        } else {
+            // Display tasks
+            LazyColumn(
+                contentPadding = PaddingValues(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(tasks) { task ->
+                    FitnessActivityCard(
+                        activityName = task.name,
+                        goalDuration = task.goalDuration,
+                        actualDuration = task.actualDuration,
+                        onUpdateClick = {
+                            showUpdateDialog = task.id?.let { id -> id to task }
+                        }
+                    )
+                }
+            }
+        }
+
+        // Dialogs
         if (showAddDialog) {
             AddTaskDialog(
-                onDismiss = { showAddDialog = false },
+                onDismiss = {
+                    showAddDialog = false
+                    authViewModel.fetchTasks() // Refresh the tasks after adding a new one
+                },
                 onAddTask = { taskName, goalDuration ->
                     authViewModel.addTask(taskName, goalDuration)
-                    showAddDialog = false
                 }
             )
         }
@@ -126,9 +171,8 @@ fun HomePage(
 
 
 
-
 @Composable
-fun AddTaskDialog(
+fun AddTaskDialogs(
     onDismiss: () -> Unit,
     onAddTask: (String, String) -> Unit // Ensure correct parameters here
 ) {
@@ -150,18 +194,22 @@ fun AddTaskDialog(
                 OutlinedTextField(
                     value = goalDuration,
                     onValueChange = { goalDuration = it },
-                    label = { Text("Goal ") }
+                    label = { Text("Goal") }
                 )
                 Spacer(modifier = Modifier.padding(8.dp))
                 OutlinedTextField(
                     value = actualDuration,
                     onValueChange = { actualDuration = it },
-                    label = { Text("Today") }
+                    label = { Text("Achieved") }
                 )
             }
         },
         confirmButton = {
-            Button(onClick = { onAddTask(taskName, goalDuration) }) {
+            Button(onClick = {
+                onAddTask(taskName, goalDuration)
+                // After adding the task, close the dialog
+                onDismiss()
+            }) {
                 Text("Add")
             }
         },
@@ -172,9 +220,6 @@ fun AddTaskDialog(
         }
     )
 }
-
-
-
 
 
 @Composable
@@ -201,7 +246,40 @@ fun FitnessActivityCard(
             Spacer(modifier = Modifier.size(8.dp))
             Text(text = "Goal: $goalDuration", fontSize = 16.sp, color = Color.White)
             Spacer(modifier = Modifier.size(8.dp))
-            Text(text = "Actual: $actualDuration", fontSize = 16.sp, color = Color.White)
+            Text(text = "Achieved: ${if (actualDuration.isEmpty()) "0" else actualDuration}", fontSize = 16.sp, color = Color.White)
+            Spacer(modifier = Modifier.size(16.dp))
+            Button(onClick = onUpdateClick) {
+                Text(text = "Update")
+            }
+        }
+    }
+}
+
+@Composable
+fun FitnessActivityCards(
+    activityName: String,
+    goalDuration: String,
+    actualDuration: String,
+    onUpdateClick: () -> Unit // Add this parameter
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF101D40))
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .wrapContentHeight(), // Adjust to fit the content
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = activityName, fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(text = "Goal: $goalDuration", fontSize = 16.sp, color = Color.White)
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(text = "Achived: $actualDuration", fontSize = 16.sp, color = Color.White)
             Spacer(modifier = Modifier.size(16.dp))
             Button(onClick = onUpdateClick) {
                 Text(text = "Update")
@@ -231,13 +309,57 @@ fun UpdateTaskDialog(
                 OutlinedTextField(
                     value = actualDuration,
                     onValueChange = { actualDuration = it },
-                    label = { Text("Actual Duration") }
+                    label = { Text("Achived") }
                 )
             }
         },
         confirmButton = {
             Button(onClick = { onUpdateTask(actualDuration) }) {
                 Text("Update")
+            }
+        },
+        dismissButton = {
+            Button(onClick = { onDismiss() }) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun AddTaskDialog(
+    onDismiss: () -> Unit,
+    onAddTask: (String, String) -> Unit
+) {
+    var taskName by remember { mutableStateOf("") }
+    var goalDuration by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = { Text("Add New Activity") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = taskName,
+                    onValueChange = { taskName = it },
+                    label = { Text("Task Name") }
+                )
+                Spacer(modifier = Modifier.padding(8.dp))
+                OutlinedTextField(
+                    value = goalDuration,
+                    onValueChange = { goalDuration = it },
+                    label = { Text("Goal") }
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (taskName.isNotEmpty() && goalDuration.isNotEmpty()) {
+                    onAddTask(taskName, goalDuration)
+                    onDismiss() // Close the dialog after adding the task
+                }
+            }) {
+                Text("Add")
             }
         },
         dismissButton = {
