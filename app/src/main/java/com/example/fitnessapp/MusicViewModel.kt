@@ -261,7 +261,7 @@ class MusicViewModel:ViewModel()
         )
     }
 
-   //yewala
+    //yewala
     fun fetchTasksForDate(day: Int, month: Int, year: Int) {
         val userId = auth.currentUser?.uid ?: return
         firestore.collection("tasks")
@@ -277,22 +277,6 @@ class MusicViewModel:ViewModel()
                 }
                 _tasks.postValue(taskList)
             }
-    }
-    fun deleteTask(taskId: String) {
-        viewModelScope.launch {
-            val userId = auth.currentUser?.uid
-            if (userId != null) {
-                // Delete the task from Firebase Realtime Database
-                database.child("tasks").child(userId).child(taskId).removeValue()
-                    .addOnSuccessListener {
-                        Log.d("MusicViewModel", "Task deleted successfully")
-                        fetchTasks() // Refresh tasks after deletion
-                    }
-                    .addOnFailureListener { exception ->
-                        Log.e("MusicViewModel", "Error deleting task: ${exception.message}")
-                    }
-            }
-        }
     }
 
 

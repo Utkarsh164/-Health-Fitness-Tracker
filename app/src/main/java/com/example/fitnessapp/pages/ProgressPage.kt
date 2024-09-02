@@ -179,6 +179,7 @@ fun FitnessActivity(
             .fillMaxWidth()
             .padding(8.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF101D40))
+
     ) {
         Column(
             modifier = Modifier
