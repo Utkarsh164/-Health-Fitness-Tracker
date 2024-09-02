@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.fitnessapp.MusicViewModel
+import java.util.Calendar
 
 @Composable
 fun ProgressPage(
@@ -108,7 +109,7 @@ fun ProgressPage(
         TextField(
             value = day,
             onValueChange = { day = it },
-            label = { Text("Day") },
+            label = { Text("Date") },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.padding(8.dp))
@@ -135,8 +136,12 @@ fun ProgressPage(
                 val monthInt = month.toIntOrNull()
                 val yearInt = year.toIntOrNull()
 
-                if (dayInt == null || monthInt == null || yearInt == null || dayInt <= 0 || monthInt <= 0 || yearInt <= 0) {
-                    showToast = "Please enter valid date values"
+                if (dayInt == null || dayInt !in 1..31) {
+                    showToast = "Invalid day"
+                } else if (monthInt == null || monthInt !in 1..12) {
+                    showToast = "Invalid month"
+                } else if (yearInt == null || yearInt < 1900 || yearInt > Calendar.getInstance().get(Calendar.YEAR)) {
+                    showToast = "Invalid year"
                 } else {
                     authViewModel.fetchTasksForDate(dayInt, monthInt, yearInt)
                 }
@@ -146,6 +151,7 @@ fun ProgressPage(
         ) {
             Text(text = "Show Progress")
         }
+
 
         LazyColumn(
             contentPadding = PaddingValues(vertical = 16.dp),

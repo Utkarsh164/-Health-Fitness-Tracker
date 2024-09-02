@@ -356,7 +356,7 @@ fun AddTaskDialog(
             Button(onClick = {
                 if (taskName.isNotEmpty() && goalDuration.isNotEmpty()) {
                     onAddTask(taskName, goalDuration)
-                    onDismiss() // Close the dialog after adding the task
+                    onDismiss()
                 }
             }) {
                 Text("Add")
